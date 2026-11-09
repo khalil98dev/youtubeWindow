@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/window_preset.dart';
+import '../services/platform_helper.dart';
+import '../services/youtube_premium_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/bouncy_button.dart';
+import '../widgets/download_dialog.dart';
+import 'downloads_view.dart';
 
 class SettingsView extends StatefulWidget {
   final TextEditingController urlController;
@@ -10,6 +14,13 @@ class SettingsView extends StatefulWidget {
   final TextEditingController heightController;
   final bool isAlwaysOnTop;
   final ValueChanged<bool> onToggleAlwaysOnTop;
+  final bool isAdBlockerEnabled;
+  final ValueChanged<bool> onToggleAdBlocker;
+  final bool isBackgroundPlayEnabled;
+  final ValueChanged<bool> onToggleBackgroundPlay;
+  final bool isAudioOnlyEnabled;
+  final ValueChanged<bool> onToggleAudioOnly;
+  final VoidCallback onOpenSignIn;
   final bool isLoading;
   final String? errorMessage;
   final VoidCallback onLaunch;
@@ -21,6 +32,13 @@ class SettingsView extends StatefulWidget {
     required this.heightController,
     required this.isAlwaysOnTop,
     required this.onToggleAlwaysOnTop,
+    this.isAdBlockerEnabled = true,
+    required this.onToggleAdBlocker,
+    this.isBackgroundPlayEnabled = true,
+    required this.onToggleBackgroundPlay,
+    this.isAudioOnlyEnabled = false,
+    required this.onToggleAudioOnly,
+    required this.onOpenSignIn,
     required this.isLoading,
     this.errorMessage,
     required this.onLaunch,
@@ -34,10 +52,11 @@ class _SettingsViewState extends State<SettingsView> {
   String _selectedPresetId = 'hd';
 
   final List<Map<String, String>> _quickLinks = [
-    {'name': 'YouTube Home', 'url': 'https://www.youtube.com'},
+    {'name': 'YouTube Home', 'url': YouTubePremiumService.youtubeHomeUrl},
+    {'name': '🎵 YouTube Music', 'url': YouTubePremiumService.youtubeMusicUrl},
+    {'name': 'Subscriptions', 'url': YouTubePremiumService.youtubeSubscriptionsUrl},
     {'name': 'Trending', 'url': 'https://www.youtube.com/feed/trending'},
-    {'name': 'Music', 'url': 'https://music.youtube.com'},
-    {'name': 'Lofi Chill ☕', 'url': 'https://www.youtube.com/watch?v=jfKfPfyJRdk'},
+    {'name': 'Lofi Beats ☕', 'url': 'https://www.youtube.com/watch?v=jfKfPfyJRdk'},
   ];
 
   @override
@@ -101,6 +120,25 @@ class _SettingsViewState extends State<SettingsView> {
     }
   }
 
+  void _openOfflineLibrary() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => DownloadsView(
+          currentUrl: widget.urlController.text.trim(),
+        ),
+      ),
+    );
+  }
+
+  void _openDownloadDialogFromInput() {
+    showDialog(
+      context: context,
+      builder: (ctx) => DownloadDialog(
+        initialUrl: widget.urlController.text.trim(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -117,19 +155,27 @@ class _SettingsViewState extends State<SettingsView> {
                 children: [
                   // Header
                   _buildHeader(),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 18),
+
+                  // YouTube Sign-In Card
+                  _buildSignInCard(),
+                  const SizedBox(height: 16),
 
                   // URL Input Card
                   _buildUrlSection(),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 16),
 
-                  // Window Presets Card
-                  _buildDimensionsSection(),
-                  const SizedBox(height: 18),
+                  // YouTube Premium Features Section
+                  _buildPremiumFeaturesSection(),
+                  const SizedBox(height: 16),
 
-                  // Always on Top Card
-                  _buildAlwaysOnTopCard(),
-                  const SizedBox(height: 24),
+                  // Window Presets Card (Desktop only)
+                  if (PlatformHelper.isDesktop) ...[
+                    _buildDimensionsSection(),
+                    const SizedBox(height: 16),
+                    _buildAlwaysOnTopCard(),
+                    const SizedBox(height: 16),
+                  ],
 
                   // Error Display
                   if (widget.errorMessage != null) ...[
@@ -153,15 +199,15 @@ class _SettingsViewState extends State<SettingsView> {
     return Row(
       children: [
         Container(
-          width: 44,
-          height: 44,
+          width: 48,
+          height: 48,
           decoration: BoxDecoration(
             gradient: AppTheme.primaryGradient,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
             boxShadow: [
               BoxShadow(
-                color: AppTheme.youtubeRed.withValues(alpha: 0.35),
-                blurRadius: 16,
+                color: AppTheme.youtubeRed.withValues(alpha: 0.4),
+                blurRadius: 18,
                 offset: const Offset(0, 4),
               ),
             ],
@@ -169,35 +215,140 @@ class _SettingsViewState extends State<SettingsView> {
           child: const Icon(
             Icons.play_arrow_rounded,
             color: Colors.white,
-            size: 28,
+            size: 32,
           ),
         ),
         const SizedBox(width: 14),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text(
-                'YouTube Viewer',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: -0.4,
-                  color: AppTheme.textPrimary,
-                ),
+            children: [
+              Row(
+                children: [
+                  const Text(
+                    'YouTube',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.4,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppTheme.youtubeRed,
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: const Text(
+                      'PREMIUM',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.8,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              SizedBox(height: 2),
-              Text(
-                'Desktop floating player & PiP controller',
+              const SizedBox(height: 3),
+              const Text(
+                'Background playback · Ad-Free · Offline Downloads',
                 style: TextStyle(
-                  fontSize: 12.5,
+                  fontSize: 12,
                   color: AppTheme.textSecondary,
                 ),
               ),
             ],
           ),
         ),
+        // Offline Downloads Button
+        IconButton(
+          onPressed: _openOfflineLibrary,
+          tooltip: 'Offline Downloads',
+          icon: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceElevated,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.borderSubtle),
+            ),
+            child: const Icon(Icons.download_done_rounded, color: AppTheme.premiumGold, size: 20),
+          ),
+        ),
       ],
+    );
+  }
+
+  Widget _buildSignInCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppTheme.premiumGold.withValues(alpha: 0.35),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.premiumGold.withValues(alpha: 0.05),
+            blurRadius: 16,
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppTheme.premiumBadgeBg,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppTheme.premiumGold.withValues(alpha: 0.4)),
+            ),
+            child: const Icon(
+              Icons.account_circle_rounded,
+              size: 24,
+              color: AppTheme.premiumGold,
+            ),
+          ),
+          const SizedBox(width: 14),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'YouTube & Google Sign-In',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Sign in to sync your subscriptions, playlists, and history safely.',
+                  style: TextStyle(fontSize: 11.5, color: AppTheme.textSecondary),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          ElevatedButton.icon(
+            onPressed: widget.onOpenSignIn,
+            icon: const Icon(Icons.login_rounded, size: 16),
+            label: const Text('Sign In', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.youtubeRed,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -216,33 +367,64 @@ class _SettingsViewState extends State<SettingsView> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                'Video or Channel URL',
+                'Video, Playlist, or Channel URL',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: AppTheme.textPrimary,
                 ),
               ),
-              BouncyButton(
-                onPressed: _pasteFromClipboard,
-                tooltip: 'Paste from clipboard',
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppTheme.surfaceElevated,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: AppTheme.borderSubtle),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Icon(Icons.content_paste_rounded, size: 13, color: AppTheme.textSecondary),
-                    SizedBox(width: 4),
-                    Text(
-                      'Paste',
-                      style: TextStyle(fontSize: 11.5, color: AppTheme.textSecondary),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  BouncyButton(
+                    onPressed: _openDownloadDialogFromInput,
+                    tooltip: 'Download video/audio from input URL or running session',
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppTheme.youtubeRed.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: AppTheme.youtubeRed.withValues(alpha: 0.4)),
                     ),
-                  ],
-                ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.download_rounded, size: 13, color: AppTheme.youtubeRedLight),
+                        SizedBox(width: 4),
+                        Text(
+                          'Download',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.youtubeRedLight,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  BouncyButton(
+                    onPressed: _pasteFromClipboard,
+                    tooltip: 'Paste from clipboard',
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceElevated,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: AppTheme.borderSubtle),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.content_paste_rounded, size: 13, color: AppTheme.textSecondary),
+                        SizedBox(width: 4),
+                        Text(
+                          'Paste',
+                          style: TextStyle(fontSize: 11.5, color: AppTheme.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -317,6 +499,120 @@ class _SettingsViewState extends State<SettingsView> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPremiumFeaturesSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.workspace_premium_rounded, size: 18, color: AppTheme.premiumGold),
+              SizedBox(width: 8),
+              Text(
+                'YouTube Premium Features',
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // 1. Mobile Background Playback Toggle
+          _buildFeatureToggleTile(
+            title: 'Mobile Background Playback',
+            subtitle: 'Keeps audio playing when phone screen is locked or switching apps',
+            icon: Icons.headphones_rounded,
+            iconColor: AppTheme.accentCyan,
+            value: widget.isBackgroundPlayEnabled,
+            onChanged: widget.onToggleBackgroundPlay,
+          ),
+          const Divider(height: 16, color: AppTheme.borderSubtle),
+
+          // 2. Ad-Free Blocker Toggle
+          _buildFeatureToggleTile(
+            title: 'Ad-Free Playback',
+            subtitle: 'Auto-skips pre-roll/mid-roll video ads, removes banners & promos',
+            icon: Icons.shield_rounded,
+            iconColor: AppTheme.accentGreen,
+            value: widget.isAdBlockerEnabled,
+            onChanged: widget.onToggleAdBlocker,
+          ),
+          const Divider(height: 16, color: AppTheme.borderSubtle),
+
+          // 3. Audio-Only Mode Toggle
+          _buildFeatureToggleTile(
+            title: 'Smart Audio-Only Mode',
+            subtitle: 'Turns off video canvas rendering to save up to 85% battery & mobile data',
+            icon: Icons.music_note_rounded,
+            iconColor: AppTheme.youtubeRedLight,
+            value: widget.isAudioOnlyEnabled,
+            onChanged: widget.onToggleAudioOnly,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeatureToggleTile({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color iconColor,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: iconColor.withValues(alpha: 0.15),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 18, color: iconColor),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+              ),
+            ],
+          ),
+        ),
+        Switch(
+          value: value,
+          activeThumbColor: iconColor,
+          activeTrackColor: iconColor.withValues(alpha: 0.3),
+          inactiveThumbColor: AppTheme.textSecondary,
+          inactiveTrackColor: AppTheme.surfaceElevated,
+          onChanged: onChanged,
+        ),
+      ],
     );
   }
 
@@ -599,9 +895,9 @@ class _SettingsViewState extends State<SettingsView> {
         height: 48,
         alignment: Alignment.center,
         child: widget.isLoading
-            ? Row(
+            ? const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
+                children: [
                   SizedBox(
                     width: 18,
                     height: 18,
@@ -621,13 +917,13 @@ class _SettingsViewState extends State<SettingsView> {
                   ),
                 ],
               )
-            : Row(
+            : const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(Icons.play_arrow_rounded, color: Colors.white, size: 22),
+                children: [
+                  Icon(Icons.play_arrow_rounded, color: Colors.white, size: 24),
                   SizedBox(width: 8),
                   Text(
-                    'Launch YouTube Player',
+                    'Launch YouTube Premium Player',
                     style: TextStyle(
                       fontSize: 14.5,
                       fontWeight: FontWeight.bold,

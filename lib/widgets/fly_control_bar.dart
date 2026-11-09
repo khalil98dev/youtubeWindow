@@ -2,15 +2,18 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
+import '../services/platform_helper.dart';
 import '../theme/app_theme.dart';
 import 'glass_icon_button.dart';
 
 class FlyControlBar extends StatefulWidget {
   final bool isAlwaysOnTop;
   final bool isFullDragMode;
+  final bool isAdBlockerEnabled;
   final VoidCallback onTogglePin;
   final VoidCallback onToggleFullDrag;
   final VoidCallback onRestoreWindow;
+  final VoidCallback? onToggleAdBlocker;
   final VoidCallback? onBackToSettings;
   final VoidCallback? onReload;
   final ValueChanged<Offset>? onDragButton;
@@ -19,9 +22,11 @@ class FlyControlBar extends StatefulWidget {
     super.key,
     required this.isAlwaysOnTop,
     this.isFullDragMode = false,
+    this.isAdBlockerEnabled = true,
     required this.onTogglePin,
     required this.onToggleFullDrag,
     required this.onRestoreWindow,
+    this.onToggleAdBlocker,
     this.onBackToSettings,
     this.onReload,
     this.onDragButton,
@@ -211,22 +216,23 @@ class FlyControlBarState extends State<FlyControlBar> {
           ),
         const SizedBox(width: 5),
 
-        // Draggable Grip handle (drags the native window)
-        DragToMoveArea(
-          child: Tooltip(
-            message: 'Drag window',
-            child: Container(
-              width: 26,
-              height: 34,
-              alignment: Alignment.center,
-              child: const Icon(
-                Icons.drag_indicator_rounded,
-                size: 16,
-                color: Colors.white60,
+        // Draggable Grip handle (drags the native window on desktop)
+        if (PlatformHelper.isDesktop)
+          DragToMoveArea(
+            child: Tooltip(
+              message: 'Drag window',
+              child: Container(
+                width: 26,
+                height: 34,
+                alignment: Alignment.center,
+                child: const Icon(
+                  Icons.drag_indicator_rounded,
+                  size: 16,
+                  color: Colors.white60,
+                ),
               ),
             ),
           ),
-        ),
         const SizedBox(width: 5),
 
         // Full Screen Move toggle
@@ -252,6 +258,24 @@ class FlyControlBarState extends State<FlyControlBar> {
           onPressed: widget.onTogglePin,
         ),
         const SizedBox(width: 5),
+
+        // Ad Blocker Shield
+        if (widget.onToggleAdBlocker != null) ...[
+          GlassIconButton(
+            icon: widget.isAdBlockerEnabled
+                ? Icons.shield_rounded
+                : Icons.shield_outlined,
+            size: 34,
+            iconSize: 15,
+            isActive: widget.isAdBlockerEnabled,
+            activeColor: AppTheme.accentGreen,
+            tooltip: widget.isAdBlockerEnabled
+                ? 'Ad Blocker Active'
+                : 'Ad Blocker Disabled',
+            onPressed: widget.onToggleAdBlocker,
+          ),
+          const SizedBox(width: 5),
+        ],
 
         // Restore Window Controls & Borders
         GlassIconButton(

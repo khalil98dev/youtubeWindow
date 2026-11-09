@@ -19,6 +19,9 @@ class AppTheme {
   static const Color pinActiveSurface = Color(0x24FFB800);
   static const Color accentCyan = Color(0xFF00E5FF);
   static const Color accentGreen = Color(0xFF00E676);
+  static const Color premiumGold = Color(0xFFFFD700);
+  static const Color premiumGoldLight = Color(0xFFFFE680);
+  static const Color premiumBadgeBg = Color(0x26FFD700);
 
   // Typography Colors
   static const Color textPrimary = Color(0xFFF5F6FA);
